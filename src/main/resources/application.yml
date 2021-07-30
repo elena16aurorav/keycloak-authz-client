@@ -14,3 +14,6 @@ keycloak-authz-server:
     user:
         login: myuser
         password: ivie2Aisho
+
+jwt:
+    lifetime: 5

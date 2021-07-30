@@ -1,6 +1,7 @@
 package com.example.keycloakauthzclient;
 
 import lombok.RequiredArgsConstructor;
+import org.keycloak.representations.AccessTokenResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -8,22 +9,31 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class TestController {
 
-    private final KeyCloakClient keyCloakClient;
+    private final KeycloakService keycloakService;
 
     @GetMapping("/generate")
     public String generateToken() {
-        String token = keyCloakClient.getAccessToken();
-        return token;
+        return keycloakService.getTokenByPassword();
     }
 
-    @GetMapping("/validate")
-    public String validateToken() {
-        return "private";
+    @GetMapping("/refresh")
+    public String refreshToken() {
+        return keycloakService.getTokenByRefreshToken();
     }
 
-    @GetMapping("/publickey")
-    public String getPublicKey() {
-        return "private";
+    @GetMapping("/actual-token")
+    public String getActualToken() {
+        return keycloakService.getActualAccessToken();
+    }
+
+    @GetMapping("/access-token")
+    public String getAccessToken() {
+        return KeycloakService.accessToken;
+    }
+
+    @GetMapping("/refresh-token")
+    public String getRefreshToken() {
+        return KeycloakService.refreshToken;
     }
 
 
