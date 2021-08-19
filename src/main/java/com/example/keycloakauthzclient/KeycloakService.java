@@ -10,7 +10,9 @@ import com.auth0.jwt.JWT;
 
 import java.time.LocalDateTime;
 
+import static com.example.keycloakauthzclient.CachingConfig.KEYCLOAK_TOKENS_CACHE;
 import static com.example.keycloakauthzclient.DateUtils.convertLocalDateTimeToDate;
+import static com.example.keycloakauthzclient.KeycloakClient.CURRENT_TOKENS;
 
 @RequiredArgsConstructor
 @Service
@@ -23,7 +25,8 @@ public class KeycloakService {
     public static String accessToken;
     public static String refreshToken;
 
-    public String getActualAccessToken(){
+    //сохранение токенов в статических переменных
+    public String getActualAccessTokenStatic(){
         if(accessToken == null){
             log.info("Получение токенов по паролю");
             AccessTokenResponse accessTokenResponse = keyCloakClient.getTokenByPassword();
@@ -48,6 +51,27 @@ public class KeycloakService {
         return accessToken;
     }
 
+    //сохранение токенов с помощью кеширования
+    public String getActualAccessTokenCache(){
+        AccessTokenResponse accessTokenResponse = keyCloakClient.getTokenByPasswordCache();
+        if(isExpired(accessTokenResponse.getToken())){//accessToken is not actual
+            if(isExpired(accessTokenResponse.getRefreshToken())){//refreshToken is not actual
+                log.info("Истекло время жизни refreshToken. Получение токенов по паролю");
+                evictCachedToken();
+                getActualAccessTokenCache();
+            }else{//refreshToken is actual
+                log.info("Истекло время жизни accessToken. Получение токенов по refreshToken");
+                evictCachedToken();
+                accessTokenResponse = keyCloakClient.refreshTokenCache(accessTokenResponse.getRefreshToken());
+                var cache = cacheManager.getCache(KEYCLOAK_TOKENS_CACHE);
+                cache.put(CURRENT_TOKENS, accessTokenResponse);
+            }
+        }
+        log.info("Текущие значения: accessToken="+accessTokenResponse.getToken()
+                +"; refreshToken="+accessTokenResponse.getRefreshToken());
+        return accessTokenResponse.getToken();
+    }
+
     /**
      * определение актуальности токена
      * @param token
@@ -65,16 +89,8 @@ public class KeycloakService {
         return "accessToken="+accessToken+"; refreshToken="+refreshToken;
     }
 
-    public String getTokenByRefreshToken(){
-        AccessTokenResponse response = keyCloakClient.refreshToken(refreshToken);
-        accessToken = response.getToken();
-        refreshToken = response.getRefreshToken();
-        return "accessToken="+accessToken+"; refreshToken="+refreshToken;
-    }
-
     private void evictCachedToken(){
-        var cache = cacheManager.getCache("token");
-
+        var cache = cacheManager.getCache(KEYCLOAK_TOKENS_CACHE);
         if(null == cache){
             log.error("empty cache");
         }else{
@@ -82,4 +98,10 @@ public class KeycloakService {
         }
     }
 
+    public String getTokenByRefreshToken(){
+        AccessTokenResponse response = keyCloakClient.refreshToken(refreshToken);
+        accessToken = response.getToken();
+        refreshToken = response.getRefreshToken();
+        return "accessToken="+accessToken+"; refreshToken="+refreshToken;
+    }
 }

@@ -8,12 +8,13 @@ keycloak:
     credentials:
         secret:
 
-
 keycloak-authz-server:
-    exist: true
+    keycloak:
+        exist: true
     user:
-        login: myuser
-        password: ivie2Aisho
+        user1:
+            login: myuser
+            password: ivie2Aisho
 
 jwt:
     lifetime: 5

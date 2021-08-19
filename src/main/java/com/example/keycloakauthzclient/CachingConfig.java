@@ -19,14 +19,14 @@ public class CachingConfig {
     @Value("${jwt.lifetime}")
     private int lifetime;
 
-    public static final String TOKEN_CACHE = "token";
+    public static final String KEYCLOAK_TOKENS_CACHE = "keycloak_tokens";
 
     @Bean
     public CacheManager cacheManager(Ticker ticker){
         var cacheManager = new SimpleCacheManager();
         cacheManager.setCaches(
                 Arrays.asList(
-                        buildCache(TOKEN_CACHE, ticker, (lifetime-1)*60)
+                        buildCache(KEYCLOAK_TOKENS_CACHE, ticker, (lifetime-1)*60)
                 )
         );
         return cacheManager;

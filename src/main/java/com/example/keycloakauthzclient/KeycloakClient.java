@@ -2,6 +2,8 @@ package com.example.keycloakauthzclient;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.client.HttpClient;
 import org.keycloak.OAuth2Constants;
@@ -17,6 +19,9 @@ import org.keycloak.representations.AccessToken;
 import org.keycloak.representations.AccessTokenResponse;
 import org.keycloak.representations.idm.KeysMetadataRepresentation;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 import java.math.BigInteger;
@@ -32,18 +37,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.example.keycloakauthzclient.CachingConfig.KEYCLOAK_TOKENS_CACHE;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class KeycloakClient {
 
-    @Value("${keycloak-authz-server.user.login}")
+    @Value("${keycloak-authz-server.user.user1.login}")
     private String userLogin;
 
-    @Value("${keycloak-authz-server.user.password}")
+    @Value("${keycloak-authz-server.user.user1.password}")
     private String userPassword;
 
-    @Value("${keycloak-authz-server.exist}")
+    @Value("${keycloak-authz-server.keycloak.exist}")
     private boolean iKeycloak;
 
     @Value("${keycloak.realm}")
@@ -58,15 +65,14 @@ public class KeycloakClient {
     @Value("${keycloak.credentials.secret}")
     private String clientSecret;
 
-    public static String accessToken;
-    public static String refreshToken;
+    public static final String CURRENT_TOKENS = "current_tokens";
 
-    //@Bean
     public org.keycloak.authorization.client.Configuration getKeyCloakConfig(){
-        Map<String, Object> credentials = getCredentials();
+//        Map<String, Object> credentials = getCredentials();
 
         HttpClient httpClient = new HttpClientBuilder().build();
-        Configuration configuration = new Configuration(authServerUrl, realm, clientId, credentials, httpClient);
+//        Configuration configuration = new Configuration(authServerUrl, realm, clientId, credentials, httpClient);
+        Configuration configuration = new Configuration();
         if(configuration == null){
             log.error("Не удалось подключиться к серверу KeyCloak!!!");
             //
@@ -127,6 +133,51 @@ public class KeycloakClient {
                 .execute();
     }
 
+    /**
+     * receive new AccessToken and RefreshToken by username/password
+     */
+    @Cacheable(value=KEYCLOAK_TOKENS_CACHE, key = "#root.target.CURRENT_TOKENS")
+    public AccessTokenResponse getTokenByPasswordCache(){
+        log.info("getTokenByPasswordCache");
+        String url = authServerUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+
+        Http http = new Http(getKeyCloakConfig(), (params, headers) -> {});
+        return http.<AccessTokenResponse>post(url)
+                .authentication()
+                .client()
+                .form()
+                .param("grant_type", "password")
+                .param("client_id", clientId)
+                .param("client_secret", clientSecret)
+                .param("username", userLogin)
+                .param("password", userPassword)
+                .response()
+                .json(AccessTokenResponse.class)
+                .execute();
+    }
+
+    /**
+     * Receive new AccessToken and RefreshToken by OldRefreshToken
+     * @param refreshToken
+     */
+    //@CachePut(value=KEYCLOAK_TOKENS_CACHE, key = "#root.target.CURRENT_TOKENS")
+    public AccessTokenResponse refreshTokenCache(String refreshToken) {
+        log.info("refreshTokenCache");
+        String url = authServerUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+
+        Http http = new Http(getKeyCloakConfig(), (params, headers) -> {});
+        return http.<AccessTokenResponse>post(url)
+                .authentication()
+                .client()
+                .form()
+                .param("grant_type", "refresh_token")
+                .param("refresh_token", refreshToken)
+                .param("client_id", clientId)
+                .param("client_secret", (String) getCredentials().get("secret"))
+                .response()
+                .json(AccessTokenResponse.class)
+                .execute();
+    }
 //
     public AccessToken getAccessToken() {
         return getAccessToken(newKeycloakBuilderWithClientCredentials().build());

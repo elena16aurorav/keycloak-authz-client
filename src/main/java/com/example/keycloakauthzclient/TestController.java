@@ -23,7 +23,7 @@ public class TestController {
 
     @GetMapping("/actual-token")
     public String getActualToken() {
-        return keycloakService.getActualAccessToken();
+        return keycloakService.getActualAccessTokenCache();
     }
 
     @GetMapping("/access-token")
